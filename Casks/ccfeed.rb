@@ -1,52 +1,8 @@
-require "download_strategy"
-
-# Pulls a release asset from a PRIVATE GitHub repo via HOMEBREW_GITHUB_API_TOKEN.
-class GitHubPrivateRepositoryReleaseDownloadStrategy < CurlDownloadStrategy
-  def initialize(url, name, version, **meta)
-    super
-    @github_token = ENV["HOMEBREW_GITHUB_API_TOKEN"]
-    if @github_token.to_s.empty?
-      raise CurlDownloadStrategyError,
-            "Set HOMEBREW_GITHUB_API_TOKEN (e.g. export HOMEBREW_GITHUB_API_TOKEN=$(gh auth token))."
-    end
-    unless @url =~ %r{https://github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/(\S+)}
-      raise CurlDownloadStrategyError, "Invalid GitHub release URL: #{@url}"
-    end
-    @owner, @repo, @tag, @filename = Regexp.last_match.captures
-  end
-
-  def fetch(timeout: nil)
-    # Resolve asset ID via GitHub API (token auth for private repo).
-    api_url = "https://api.github.com/repos/#{@owner}/#{@repo}/releases/tags/#{@tag}"
-    response = IO.popen(["curl", "-fsSL",
-                         "-H", "Authorization: token #{@github_token}",
-                         "-H", "Accept: application/vnd.github+json",
-                         api_url], &:read)
-    rel = JSON.parse(response)
-    asset = rel["assets"].find { |a| a["name"] == @filename }
-    raise CurlDownloadStrategyError, "Asset #{@filename} not found in release #{@tag}" unless asset
-
-    @asset_id = asset["id"]
-    super
-  end
-
-  private
-
-  def _fetch(url:, resolved_url:, timeout:)
-    asset_url = "https://api.github.com/repos/#{@owner}/#{@repo}/releases/assets/#{@asset_id}"
-    curl_download(asset_url,
-                  "--header", "Accept: application/octet-stream",
-                  "--header", "Authorization: token #{@github_token}",
-                  to: temporary_path, timeout: timeout)
-  end
-end
-
 cask "ccfeed" do
   version "0.1.0"
   sha256 "fed7134aa7bb0eb7c2f9c86d7146b7f85d6d03ea0cbeb86a8fe51fdfe292b733"
 
-  url "https://github.com/max-parke-scale/homebrew-tap/releases/download/v#{version}/ccfeed-#{version}.zip",
-      using: GitHubPrivateRepositoryReleaseDownloadStrategy
+  url "https://github.com/max-parke-scale/homebrew-tap/releases/download/v#{version}/ccfeed-#{version}.zip"
   name "ccfeed"
   desc "Live JSONL feed viewer for Claude Code sessions"
   homepage "https://github.com/max-parke-scale/ccfeed"
