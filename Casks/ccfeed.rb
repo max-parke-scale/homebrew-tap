@@ -2,30 +2,39 @@ require "download_strategy"
 
 # Pulls a release asset from a PRIVATE GitHub repo via HOMEBREW_GITHUB_API_TOKEN.
 class GitHubPrivateRepositoryReleaseDownloadStrategy < CurlDownloadStrategy
-  require "utils/github"
-
   def initialize(url, name, version, **meta)
     super
     @github_token = ENV["HOMEBREW_GITHUB_API_TOKEN"]
-    raise CurlDownloadStrategyError, "Set HOMEBREW_GITHUB_API_TOKEN (e.g. export HOMEBREW_GITHUB_API_TOKEN=$(gh auth token))." if @github_token.to_s.empty?
-    unless @url =~ %r{https://github.com/([^/]+)/([^/]+)/releases/download/([^/]+)/(\S+)}
+    if @github_token.to_s.empty?
+      raise CurlDownloadStrategyError,
+            "Set HOMEBREW_GITHUB_API_TOKEN (e.g. export HOMEBREW_GITHUB_API_TOKEN=$(gh auth token))."
+    end
+    unless @url =~ %r{https://github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/(\S+)}
       raise CurlDownloadStrategyError, "Invalid GitHub release URL: #{@url}"
     end
     @owner, @repo, @tag, @filename = Regexp.last_match.captures
   end
 
   def fetch(timeout: nil)
-    rel = GitHub.open_api("https://api.github.com/repos/#{@owner}/#{@repo}/releases/tags/#{@tag}")
+    # Resolve asset ID via GitHub API (token auth for private repo).
+    api_url = "https://api.github.com/repos/#{@owner}/#{@repo}/releases/tags/#{@tag}"
+    response = Utils.popen_read("curl", "-fsSL",
+                                "-H", "Authorization: token #{@github_token}",
+                                "-H", "Accept: application/vnd.github+json",
+                                api_url)
+    rel = JSON.parse(response)
     asset = rel["assets"].find { |a| a["name"] == @filename }
-    raise CurlDownloadStrategyError, "Asset #{@filename} not found in #{@tag}" unless asset
-    @asset_url = "https://api.github.com/repos/#{@owner}/#{@repo}/releases/assets/#{asset["id"]}"
+    raise CurlDownloadStrategyError, "Asset #{@filename} not found in release #{@tag}" unless asset
+
+    @asset_id = asset["id"]
     super
   end
 
   private
 
   def _fetch(url:, resolved_url:, timeout:)
-    curl_download(@asset_url,
+    asset_url = "https://api.github.com/repos/#{@owner}/#{@repo}/releases/assets/#{@asset_id}"
+    curl_download(asset_url,
                   "--header", "Accept: application/octet-stream",
                   "--header", "Authorization: token #{@github_token}",
                   to: temporary_path, timeout: timeout)
