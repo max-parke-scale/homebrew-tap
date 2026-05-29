@@ -18,10 +18,10 @@ class GitHubPrivateRepositoryReleaseDownloadStrategy < CurlDownloadStrategy
   def fetch(timeout: nil)
     # Resolve asset ID via GitHub API (token auth for private repo).
     api_url = "https://api.github.com/repos/#{@owner}/#{@repo}/releases/tags/#{@tag}"
-    response = Utils.popen_read("curl", "-fsSL",
-                                "-H", "Authorization: token #{@github_token}",
-                                "-H", "Accept: application/vnd.github+json",
-                                api_url)
+    response = IO.popen(["curl", "-fsSL",
+                         "-H", "Authorization: token #{@github_token}",
+                         "-H", "Accept: application/vnd.github+json",
+                         api_url], &:read)
     rel = JSON.parse(response)
     asset = rel["assets"].find { |a| a["name"] == @filename }
     raise CurlDownloadStrategyError, "Asset #{@filename} not found in release #{@tag}" unless asset
