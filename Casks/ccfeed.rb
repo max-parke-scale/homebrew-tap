@@ -9,5 +9,10 @@ cask "ccfeed" do
 
   app "Ccfeed.app"
 
+  # Unsigned app: strip macOS quarantine post-install so it isn't flagged "damaged".
+  postflight do
+    system_command "/usr/bin/xattr", args: ["-cr", "#{appdir}/Ccfeed.app"]
+  end
+
   zap trash: ["~/.config/ccfeed"]
 end
