@@ -1,6 +1,6 @@
 cask "ccfeed" do
-  version "0.2.1"
-  sha256 "035ffae73eb05c7d576ea9b61aa5ea67e4e0f611f9d948b6007c30f8c46ab143"
+  version "0.3.0"
+  sha256 "7673351c6becdb1f21ff554b84b53bd96b0edc6093e2351c45975ff8dc1a3fa9"
 
   url "https://github.com/max-parke-scale/homebrew-tap/releases/download/v#{version}/ccfeed-#{version}.zip"
   name "ccfeed"
